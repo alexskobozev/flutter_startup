@@ -1,19 +1,20 @@
 // lib/startup/tasks/firebase_task.dart
 import 'dart:async';
 import 'dart:math';
+import '../results/app_flags.dart';
+import '../results/firebase_app_id.dart';
 import '../startup_task.dart';
 import '../startup_context.dart';
-import 'flags_task.dart';
 
 /// Initializes Firebase services.
-class FirebaseTask extends StartupTask<String> {
+class FirebaseTask extends StartupTask<FirebaseAppId> {
   static const String id = 'FirebaseTask';
 
   @override
   String get id => FirebaseTask.id;
 
   @override
-  Set<String> get dependencies => {FlagsTask.id};
+  Set<Type> get dependencies => {AppFlags};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -21,17 +22,17 @@ class FirebaseTask extends StartupTask<String> {
   }
 
   @override
-  Future<String> run(StartupContext context) async {
+  Future<FirebaseAppId> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Firebase...');
 
     // Access flags from context if needed for Firebase initialization
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
-    context.observabilityService.logVerbose('$id: Firebase init with flags: $appFlags');
+    final appFlags = context.get<AppFlags>();
+    context.observabilityService.logVerbose('$id: Firebase init with flags: ${appFlags.values}');
 
     await Future.delayed(Duration(milliseconds: 400 + Random().nextInt(200)));
 
-    final firebaseAppId = 'mock-firebase-app-${Random().nextInt(100)}';
-    context.observabilityService.logInfo('$id: Firebase initialized with App ID: $firebaseAppId.');
-    return firebaseAppId;
+    final firebaseAppIdValue = 'mock-firebase-app-${Random().nextInt(100)}';
+    context.observabilityService.logInfo('$id: Firebase initialized with App ID: $firebaseAppIdValue.');
+    return FirebaseAppId(firebaseAppIdValue);
   }
 }

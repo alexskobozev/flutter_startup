@@ -1,39 +1,54 @@
 // lib/startup/startup_context.dart
 
-import 'observability_service.dart'; // Added import
-import 'startup_task.dart'; // Added import for StartupTask.id documentation reference
+import 'package:get_it/get_it.dart';
 
-/// Provides a shared context for [StartupTask]s.
-/// It allows tasks to store and retrieve data, making results of one task
-/// available to subsequent tasks. It also provides access to shared services
-/// like [ObservabilityService].
+import 'observability_service.dart';
+
+/// Provides a shared context for [StartupTask]s using a service locator (`GetIt`).
+/// It allows tasks to register and retrieve dependencies by their type.
+/// It also provides access to shared services like [ObservabilityService].
 class StartupContext {
-  final Map<String, dynamic> _values = {};
+  final GetIt getIt;
   final ObservabilityService observabilityService;
   final Map<String, dynamic> flags;
 
-  StartupContext({required this.observabilityService, required this.flags});
+  StartupContext({
+    required this.getIt,
+    required this.observabilityService,
+    required this.flags,
+  });
 
-  /// Stores a value in the context, associated with a [key].
-  /// Typically, the [key] is the [StartupTask.id] that produced the value.
-  void put<T>(String key, T value) {
-    _values[key] = value;
-    observabilityService.logVerbose('StartupContext: $key registered with value $value');
+  /// Registers a value (singleton) in the service locator.
+  /// The value is registered under its specific [Type].
+  void put<T extends Object>(T value) {
+    // Note: We are registering the result of a task as a singleton.
+    // The orchestrator ensures we don't try to register the same type twice.
+    if (!getIt.isRegistered<T>()) {
+      getIt.registerSingleton<T>(value);
+      observabilityService.logVerbose('StartupContext: Type ${T.toString()} registered with value $value');
+    } else {
+      // This should not happen if the graph is resolved correctly.
+      observabilityService.logError('StartupContext: Attempted to register Type ${T.toString()} which is already registered.');
+    }
   }
 
-  /// Retrieves a value from the context by its [key].
-  /// Throws an ArgumentError if the key is not found.
-  T get<T>(String key) {
-    if (_values.containsKey(key)) {
-      return _values[key] as T;
-    } else {
-      observabilityService.logError('StartupContext: Value for key "$key" not found.');
-      throw ArgumentError('Value for key "$key" not found in StartupContext.');
+  /// Retrieves a value from the service locator by its [Type].
+  /// Throws an exception if the type is not found.
+  T get<T extends Object>() {
+    try {
+      return getIt.get<T>();
+    } catch (e) {
+      observabilityService.logError('StartupContext: Value for type "${T.toString()}" not found.');
+      // Re-throw to fail the task, as this is a critical dependency failure.
+      rethrow;
     }
   }
 
   /// Retrieves a value from the context if it exists, otherwise returns null.
-  T? getOrNull<T>(String key) {
-    return _values[key] as T?;
+  T? getOrNull<T extends Object>() {
+    if (getIt.isRegistered<T>()) {
+      return getIt.get<T>();
+    }
+    return null;
   }
 }

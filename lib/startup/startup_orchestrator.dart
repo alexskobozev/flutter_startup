@@ -3,15 +3,16 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart'; // For @visibleForTesting
+import 'package:get_it/get_it.dart';
 
 import 'startup_task.dart';
 import 'startup_context.dart';
 import 'observability_service.dart';
 
-/// Orchestrates the execution of startup tasks.
+/// Orchestrates the execution of startup tasks based on type-safe dependencies.
 ///
 /// This class is responsible for:
-/// 1. Determining the correct execution order of tasks based on their dependencies (topological sort).
+/// 1. Determining the correct execution order of tasks based on their dependencies (topological sort by Type).
 /// 2. Executing tasks sequentially according to the resolved order.
 /// 3. Handling errors that occur during task execution.
 /// 4. Reporting progress through a stream.
@@ -21,6 +22,7 @@ class StartupOrchestrator {
   final StartupContext _context;
   final ObservabilityService _observabilityService;
   final Map<String, dynamic> _flags;
+  final GetIt _getIt;
 
   final _progressStreamController = StreamController<StartupProgress>.broadcast();
   Stream<StartupProgress> get progressStream => _progressStreamController.stream;
@@ -32,17 +34,16 @@ class StartupOrchestrator {
     required List<StartupTask<dynamic>> tasks,
     required ObservabilityService observabilityService,
     required Map<String, dynamic> flags,
+    required GetIt getIt,
   })  : _tasks = tasks,
         _observabilityService = observabilityService,
         _flags = flags,
-        _context = StartupContext(observabilityService: observabilityService, flags: flags);
+        _getIt = getIt,
+        _context = StartupContext(
+            getIt: getIt,
+            observabilityService: observabilityService,
+            flags: flags);
 
-  /// Executes all registered startup tasks respecting their dependencies.
-  ///
-  /// Returns `true` if all tasks complete successfully, `false` otherwise.
-  /// Emits [StartupProgress] events on the [progressStream].
-  /// In case of an error in any task, execution stops, an error is logged,
-  /// and `false` is returned.
   Future<bool> execute() async {
     _observabilityService.logInfo('StartupOrchestrator: Execution started.');
     final stopwatch = Stopwatch()..start();
@@ -53,21 +54,20 @@ class StartupOrchestrator {
     } catch (e, s) {
       _observabilityService.logError('StartupOrchestrator: Failed to determine task order.', e, s);
       _progressStreamController.addError(e, s);
-      _progressStreamController.close();
+      await _progressStreamController.close();
       return false;
     }
 
-    if (orderedTasks.isEmpty && _tasks.isNotEmpty) {
-        _observabilityService.logInfo('StartupOrchestrator: No tasks enabled or tasks list was empty.');
+     if (orderedTasks.isEmpty && _tasks.isNotEmpty) {
+      _observabilityService.logInfo('StartupOrchestrator: No tasks enabled or tasks list was empty.');
     } else {
-      _observabilityService.logInfo('StartupOrchestrator: Execution order: ${orderedTasks.map((t) => t.id).join(', ')}');
+      _observabilityService.logInfo('StartupOrchestrator: Execution order: ${orderedTasks.map((t) => t.id).join(' -> ')}');
     }
 
     _totalEnabledTasks = orderedTasks.length;
     _completedTasksCount = 0;
 
-    // Initial progress before first task
-    _updateProgress("Initializing...", _completedTasksCount, _totalEnabledTasks);
+    _updateProgress("Initializing...", 0, _totalEnabledTasks);
 
     for (final task in orderedTasks) {
       _observabilityService.logInfo('StartupOrchestrator: Starting task: ${task.id}');
@@ -76,7 +76,12 @@ class StartupOrchestrator {
       final taskStopwatch = Stopwatch()..start();
       try {
         final result = await task.run(_context);
-        _context.put(task.id, result); // Store result even if null, to mark completion
+        // Register the result with the context (GetIt) if it's not null and not a primitive `void`
+        if (task.produces != void && result != null) {
+            // The type of `result` must match `task.produces`.
+            // `put` handles the `isRegistered` check.
+            _context.put(result);
+        }
         taskStopwatch.stop();
         _observabilityService.recordStartupTaskTiming(task.id, taskStopwatch.elapsed, true);
         _completedTasksCount++;
@@ -85,15 +90,15 @@ class StartupOrchestrator {
         taskStopwatch.stop();
         _observabilityService.recordStartupTaskTiming(task.id, taskStopwatch.elapsed, false);
         _observabilityService.logError('StartupOrchestrator: Task ${task.id} failed.', e, s);
-        _progressStreamController.addError(e, s); // Propagate error to stream listeners
-        _progressStreamController.close();
-        return false; // Stop execution on first error
+        _progressStreamController.addError(e, s);
+        await _progressStreamController.close();
+        return false;
       }
     }
 
     stopwatch.stop();
     _observabilityService.logInfo('StartupOrchestrator: All tasks completed successfully in ${stopwatch.elapsedMilliseconds}ms.');
-    _progressStreamController.close();
+    await _progressStreamController.close();
     return true;
   }
 
@@ -108,82 +113,68 @@ class StartupOrchestrator {
     }
   }
 
-  /// Performs a topological sort of the tasks.
-  /// Filters out disabled tasks before sorting.
   @visibleForTesting
   List<StartupTask<dynamic>> getTasksInExecutionOrder() {
     final enabledTasks = _tasks.where((task) => task.isEnabled(_flags)).toList();
-    if (enabledTasks.isEmpty && _tasks.isNotEmpty) {
-        _observabilityService.logInfo("No tasks are enabled based on the current flags.");
-        return [];
+    if (enabledTasks.isEmpty) {
+      _observabilityService.logInfo("No tasks are enabled based on the current flags or task list is empty.");
+      return [];
     }
-    if (enabledTasks.isEmpty && _tasks.isEmpty) {
-        _observabilityService.logInfo("Task list is empty.");
-        return [];
-    }
-
 
     final List<StartupTask<dynamic>> sortedList = [];
-    final Map<String, _TaskNode> graph = {};
-    final Set<String> allTaskIds = enabledTasks.map((t) => t.id).toSet();
+    final Map<Type, _TaskNode> graph = {};
+    final Map<Type, StartupTask> typeProducers = {};
 
-    // Build the graph
+    // Build the graph and validate producers
     for (final task in enabledTasks) {
-      if (graph.containsKey(task.id)) {
-        throw StateError("Duplicate task ID found: ${task.id}. Task IDs must be unique.");
-      }
-      graph[task.id] = _TaskNode(task);
-      // Validate dependencies
-      for (final depId in task.dependencies) {
-        if (!allTaskIds.contains(depId)) {
-          throw StateError("Task ${task.id} has an unknown dependency: $depId. Ensure all dependencies are registered and enabled.");
+      final producesType = task.produces;
+      if (producesType != void) {
+        if (typeProducers.containsKey(producesType)) {
+          throw StateError('Duplicate producer for type $producesType: ${typeProducers[producesType]!.id} and ${task.id}');
         }
+        typeProducers[producesType] = task;
       }
+      graph[producesType] = _TaskNode(task);
     }
 
-    // Calculate in-degrees
-    for (final taskNode in graph.values) {
-      for (final depId in taskNode.task.dependencies) {
-        // Dependency must be an enabled task
-        if (graph.containsKey(depId)) {
-            graph[depId]!.dependents.add(taskNode.task.id);
-            taskNode.inDegree++;
-        } else {
-            // This case should be caught by the isEnabled filter or the earlier check,
-            // but as a safeguard:
-            _observabilityService.logVerbose("Task ${taskNode.task.id} depends on $depId, which is not enabled or present. This dependency will be ignored.");
+    // Validate dependencies and calculate in-degrees
+    for (final node in graph.values) {
+      for (final depType in node.task.dependencies) {
+        if (!typeProducers.containsKey(depType) && !_getIt.isRegistered(type: depType)) {
+          throw StateError('Task ${node.task.id} has an unknown dependency: $depType. No enabled task produces it and it is not pre-registered.');
         }
+
+        // If another task produces this dependency, establish the link
+        if (typeProducers.containsKey(depType)) {
+          final producerNode = graph[depType]!;
+          producerNode.dependents.add(node.task.produces);
+          node.inDegree++;
+        }
+        // If the dependency is already in GetIt, its in-degree contribution is 0, so no action needed.
       }
     }
 
-    final Queue<_TaskNode> queue = Queue();
-    for (final taskNode in graph.values) {
-      if (taskNode.inDegree == 0) {
-        queue.add(taskNode);
-      }
-    }
+    final Queue<_TaskNode> queue = Queue.from(graph.values.where((node) => node.inDegree == 0));
 
-    while (queue.isNotEmpty) {
+    while(queue.isNotEmpty) {
       final node = queue.removeFirst();
       sortedList.add(node.task);
 
-      for (final dependentId in node.dependents) {
-        final dependentNode = graph[dependentId]!;
-        dependentNode.inDegree--;
-        if (dependentNode.inDegree == 0) {
-          queue.add(dependentNode);
+      for (final dependentType in node.dependents) {
+        final dependentNode = graph[dependentType];
+        if (dependentNode != null) {
+          dependentNode.inDegree--;
+          if (dependentNode.inDegree == 0) {
+            queue.add(dependentNode);
+          }
         }
       }
     }
 
     if (sortedList.length != enabledTasks.length) {
-      final Set<String> sortedTaskIds = sortedList.map((t) => t.id).toSet();
-      final List<String> cycleTasks = enabledTasks
-          .where((t) => !sortedTaskIds.contains(t.id))
-          .map((t) => t.id)
-          .toList();
-      throw StateError(
-          'Circular dependency detected in startup tasks, or missing dependency. Offending tasks might include: ${cycleTasks.join(', ')}');
+      final sortedIds = sortedList.map((t) => t.id).toSet();
+      final cycleTasks = enabledTasks.where((t) => !sortedIds.contains(t.id)).map((t) => '${t.id}(produces: ${t.produces}, dependsOn: ${t.dependencies})').join(', ');
+      throw StateError('Circular dependency detected in startup tasks. Offending tasks might include: $cycleTasks');
     }
 
     return sortedList;
@@ -194,11 +185,11 @@ class StartupOrchestrator {
   }
 }
 
-/// Helper class for topological sort.
+/// Helper class for topological sort based on Types.
 class _TaskNode {
   final StartupTask<dynamic> task;
   int inDegree = 0;
-  final List<String> dependents = []; // Tasks that depend on this task
+  final List<Type> dependents = []; // Types of tasks that depend on this task's produced type
 
   _TaskNode(this.task);
 }

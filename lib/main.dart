@@ -1,10 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 // Startup Pipeline Core
 import 'startup/observability_service.dart';
 import 'startup/startup_orchestrator.dart';
 import 'startup/startup_task.dart';
+
+// Results Wrappers
+import 'startup/results/app_flags.dart';
+import 'startup/results/database_path.dart';
+import 'startup/results/firebase_app_id.dart';
+import 'startup/results/google_id.dart';
+
 
 // Startup Tasks
 import 'startup/tasks/console_logger_task.dart';
@@ -44,10 +52,12 @@ final Map<String, dynamic> fakeFlags = {
 
 
 void main() {
-  // runApp(const MyApp()); // Standard way
-  // We need to run startup logic before MyApp is fully initialized with HomeScreen
-
+  final getIt = GetIt.instance;
   final observabilityService = ObservabilityService(); // Instantiate your stub
+
+  // Pre-register services that are needed by the context or tasks but aren't
+  // produced by a task themselves.
+  getIt.registerSingleton<ObservabilityService>(observabilityService);
 
   // Instantiate all tasks
   final List<StartupTask<dynamic>> allTasks = [
@@ -69,6 +79,7 @@ void main() {
     tasks: allTasks,
     observabilityService: observabilityService,
     flags: fakeFlags,
+    getIt: getIt,
   );
 
   runApp(MyApp(orchestrator: orchestrator));

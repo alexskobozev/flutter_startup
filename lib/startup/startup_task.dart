@@ -6,11 +6,15 @@ import 'startup_context.dart'; // Added import
 /// Each task can have dependencies on other tasks and can be enabled/disabled
 /// based on configuration flags.
 abstract class StartupTask<T> {
-  /// A unique identifier for this task. Used for dependency resolution and context storage.
+  /// A unique identifier for this task. Used for logging and progress reporting.
   String get id;
 
-  /// A list of task IDs that must complete before this task can run.
-  Set<String> get dependencies;
+  /// The data type this task produces. Used for dependency resolution.
+  Type get produces => T;
+
+  /// A set of data types that must be available in the service locator (`GetIt`)
+  /// before this task can run.
+  Set<Type> get dependencies;
 
   /// Determines if this task should be executed based on the provided flags.
   /// [flags] is a map of configuration flags, typically from a remote config or local settings.

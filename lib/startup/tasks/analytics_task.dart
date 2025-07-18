@@ -1,10 +1,10 @@
 // lib/startup/tasks/analytics_task.dart
 import 'dart:async';
 import 'dart:math';
+import '../results/app_flags.dart';
+import '../results/firebase_app_id.dart';
 import '../startup_task.dart';
 import '../startup_context.dart';
-import 'firebase_task.dart';
-import 'flags_task.dart';
 
 /// Initializes Analytics.
 class AnalyticsTask extends StartupTask<bool> {
@@ -14,7 +14,7 @@ class AnalyticsTask extends StartupTask<bool> {
   String get id => AnalyticsTask.id;
 
   @override
-  Set<String> get dependencies => {FirebaseTask.id, FlagsTask.id};
+  Set<Type> get dependencies => {FirebaseAppId, AppFlags};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -25,9 +25,9 @@ class AnalyticsTask extends StartupTask<bool> {
   Future<bool> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Analytics...');
 
-    final firebaseAppId = context.get<String>(FirebaseTask.id);
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
-    context.observabilityService.logVerbose('$id: Analytics using Firebase App ID: $firebaseAppId and flags: $appFlags');
+    final firebaseAppId = context.get<FirebaseAppId>();
+    final appFlags = context.get<AppFlags>();
+    context.observabilityService.logVerbose('$id: Analytics using Firebase App ID: ${firebaseAppId.value} and flags: ${appFlags.values}');
 
     await Future.delayed(Duration(milliseconds: 200 + Random().nextInt(100)));
 

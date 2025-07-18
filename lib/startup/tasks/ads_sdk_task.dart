@@ -1,10 +1,10 @@
 // lib/startup/tasks/ads_sdk_task.dart
 import 'dart:async';
 import 'dart:math';
+import '../results/app_flags.dart';
+import '../results/google_id.dart';
 import '../startup_task.dart';
 import '../startup_context.dart';
-import 'google_id_task.dart';
-import 'flags_task.dart';
 
 /// Initializes the Ads SDK.
 class AdsSdkTask extends StartupTask<bool> {
@@ -14,7 +14,7 @@ class AdsSdkTask extends StartupTask<bool> {
   String get id => AdsSdkTask.id;
 
   @override
-  Set<String> get dependencies => {GoogleIdTask.id, FlagsTask.id};
+  Set<Type> get dependencies => {GoogleId, AppFlags};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -25,11 +25,11 @@ class AdsSdkTask extends StartupTask<bool> {
   Future<bool> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Ads SDK...');
 
-    final googleId = context.get<String>(GoogleIdTask.id);
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
-    context.observabilityService.logVerbose('$id: Ads SDK using Google ID: $googleId and flags: $appFlags');
+    final googleId = context.get<GoogleId>();
+    final appFlags = context.get<AppFlags>();
+    context.observabilityService.logVerbose('$id: Ads SDK using Google ID: ${googleId.value} and flags: ${appFlags.values}');
 
-    if (!(appFlags['ads_enabled'] ?? false)) {
+    if (!(appFlags.values['ads_enabled'] ?? false)) {
         // This check is redundant if isEnabled is correctly implemented and respected by orchestrator,
         // but good for defense.
         context.observabilityService.logInfo('$id: Ads SDK initialization skipped as per flags.');

@@ -1,9 +1,9 @@
 // lib/startup/tasks/crashlytics_task.dart
 import 'dart:async';
 import 'dart:math';
+import '../results/firebase_app_id.dart';
 import '../startup_task.dart';
 import '../startup_context.dart';
-import 'firebase_task.dart';
 
 /// Initializes Crashlytics.
 class CrashlyticsTask extends StartupTask<bool> {
@@ -13,7 +13,7 @@ class CrashlyticsTask extends StartupTask<bool> {
   String get id => CrashlyticsTask.id;
 
   @override
-  Set<String> get dependencies => {FirebaseTask.id};
+  Set<Type> get dependencies => {FirebaseAppId};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -25,8 +25,8 @@ class CrashlyticsTask extends StartupTask<bool> {
   Future<bool> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Crashlytics...');
 
-    final firebaseAppId = context.get<String>(FirebaseTask.id);
-    context.observabilityService.logVerbose('$id: Crashlytics using Firebase App ID: $firebaseAppId');
+    final firebaseAppId = context.get<FirebaseAppId>();
+    context.observabilityService.logVerbose('$id: Crashlytics using Firebase App ID: ${firebaseAppId.value}');
 
     await Future.delayed(Duration(milliseconds: 150 + Random().nextInt(50)));
 

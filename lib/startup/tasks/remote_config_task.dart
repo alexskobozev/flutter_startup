@@ -1,10 +1,9 @@
 // lib/startup/tasks/remote_config_task.dart
 import 'dart:async';
 import 'dart:math';
+import '../results/firebase_app_id.dart';
 import '../startup_task.dart';
 import '../startup_context.dart';
-import 'firebase_task.dart';
-import 'observability_init_task.dart'; // Corrected: was ObservabilityTask
 
 /// Initializes and fetches Remote Configuration.
 /// Note: This task is distinct from FlagsTask. FlagsTask might represent initial/local flags,
@@ -17,7 +16,10 @@ class RemoteConfigTask extends StartupTask<Map<String, dynamic>> {
   String get id => RemoteConfigTask.id;
 
   @override
-  Set<String> get dependencies => {FirebaseTask.id, ObservabilityInitTask.id};
+  Set<Type> get dependencies => {
+        FirebaseAppId,
+        bool, // From ObservabilityInitTask
+      };
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -28,8 +30,8 @@ class RemoteConfigTask extends StartupTask<Map<String, dynamic>> {
   Future<Map<String, dynamic>> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing and fetching Remote Config...');
 
-    final firebaseAppId = context.get<String>(FirebaseTask.id);
-    context.observabilityService.logVerbose('$id: Remote Config using Firebase App ID: $firebaseAppId');
+    final firebaseAppId = context.get<FirebaseAppId>();
+    context.observabilityService.logVerbose('$id: Remote Config using Firebase App ID: ${firebaseAppId.value}');
 
     // Simulate fetching remote values
     await Future.delayed(Duration(milliseconds: 350 + Random().nextInt(150)));
