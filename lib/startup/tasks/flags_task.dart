@@ -9,11 +9,13 @@ import 'observability_init_task.dart';
 /// Fetches remote configuration flags.
 /// In this demo, it just returns the hardcoded flags from the context.
 class FlagsTask extends StartupTask<Map<String, dynamic>> {
-  @override
-  String get id => 'FlagsTask';
+  static const String id = 'FlagsTask';
 
   @override
-  Set<String> get dependencies => {GoogleIdTask().id, ObservabilityInitTask().id};
+  String get id => FlagsTask.id;
+
+  @override
+  Set<String> get dependencies => {GoogleIdTask.id, ObservabilityInitTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) => true; // Always needed

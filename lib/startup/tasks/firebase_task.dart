@@ -7,11 +7,13 @@ import 'flags_task.dart';
 
 /// Initializes Firebase services.
 class FirebaseTask extends StartupTask<String> {
-  @override
-  String get id => 'FirebaseTask';
+  static const String id = 'FirebaseTask';
 
   @override
-  Set<String> get dependencies => {FlagsTask().id};
+  String get id => FirebaseTask.id;
+
+  @override
+  Set<String> get dependencies => {FlagsTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -23,7 +25,7 @@ class FirebaseTask extends StartupTask<String> {
     context.observabilityService.logInfo('$id: Initializing Firebase...');
 
     // Access flags from context if needed for Firebase initialization
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask().id);
+    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
     context.observabilityService.logVerbose('$id: Firebase init with flags: $appFlags');
 
     await Future.delayed(Duration(milliseconds: 400 + Random().nextInt(200)));

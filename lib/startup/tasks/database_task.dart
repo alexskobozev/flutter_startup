@@ -6,8 +6,10 @@ import '../startup_context.dart';
 
 /// Initializes the local database.
 class DatabaseTask extends StartupTask<String> {
+  static const String id = 'DatabaseTask';
+
   @override
-  String get id => 'DatabaseTask';
+  String get id => DatabaseTask.id;
 
   @override
   Set<String> get dependencies => {}; // No dependencies, can run early

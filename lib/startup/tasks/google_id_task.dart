@@ -6,8 +6,10 @@ import '../startup_context.dart';
 
 /// Fetches a fake Google Advertising ID.
 class GoogleIdTask extends StartupTask<String> {
+  static const String id = 'GoogleIdTask';
+
   @override
-  String get id => 'GoogleIdTask';
+  String get id => GoogleIdTask.id;
 
   @override
   Set<String> get dependencies => {}; // No explicit dependencies, but often a root for others

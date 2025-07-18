@@ -7,11 +7,13 @@ import 'analytics_task.dart';
 
 /// Initializes a hypothetical Feature Y.
 class FeatureYTask extends StartupTask<String> {
-  @override
-  String get id => 'FeatureYTask';
+  static const String id = 'FeatureYTask';
 
   @override
-  Set<String> get dependencies => {AnalyticsTask().id}; // Depends on analytics being ready
+  String get id => FeatureYTask.id;
+
+  @override
+  Set<String> get dependencies => {AnalyticsTask.id}; // Depends on analytics being ready
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {

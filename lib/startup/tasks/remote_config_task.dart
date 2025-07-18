@@ -11,11 +11,13 @@ import 'observability_init_task.dart'; // Corrected: was ObservabilityTask
 /// while RemoteConfigTask would be the actual fetching part if they were separate.
 /// For this demo, its role is similar to FlagsTask but can have different dependencies.
 class RemoteConfigTask extends StartupTask<Map<String, dynamic>> {
-  @override
-  String get id => 'RemoteConfigTask';
+  static const String id = 'RemoteConfigTask';
 
   @override
-  Set<String> get dependencies => {FirebaseTask().id, ObservabilityInitTask().id};
+  String get id => RemoteConfigTask.id;
+
+  @override
+  Set<String> get dependencies => {FirebaseTask.id, ObservabilityInitTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -26,7 +28,7 @@ class RemoteConfigTask extends StartupTask<Map<String, dynamic>> {
   Future<Map<String, dynamic>> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing and fetching Remote Config...');
 
-    final firebaseAppId = context.get<String>(FirebaseTask().id);
+    final firebaseAppId = context.get<String>(FirebaseTask.id);
     context.observabilityService.logVerbose('$id: Remote Config using Firebase App ID: $firebaseAppId');
 
     // Simulate fetching remote values

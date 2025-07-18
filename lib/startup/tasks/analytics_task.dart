@@ -8,11 +8,13 @@ import 'flags_task.dart';
 
 /// Initializes Analytics.
 class AnalyticsTask extends StartupTask<bool> {
-  @override
-  String get id => 'AnalyticsTask';
+  static const String id = 'AnalyticsTask';
 
   @override
-  Set<String> get dependencies => {FirebaseTask().id, FlagsTask().id};
+  String get id => AnalyticsTask.id;
+
+  @override
+  Set<String> get dependencies => {FirebaseTask.id, FlagsTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -23,8 +25,8 @@ class AnalyticsTask extends StartupTask<bool> {
   Future<bool> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Analytics...');
 
-    final firebaseAppId = context.get<String>(FirebaseTask().id);
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask().id);
+    final firebaseAppId = context.get<String>(FirebaseTask.id);
+    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
     context.observabilityService.logVerbose('$id: Analytics using Firebase App ID: $firebaseAppId and flags: $appFlags');
 
     await Future.delayed(Duration(milliseconds: 200 + Random().nextInt(100)));

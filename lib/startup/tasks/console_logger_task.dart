@@ -6,8 +6,10 @@ import '../startup_context.dart';
 /// Initializes a simple console logger.
 /// This task is always enabled and has no dependencies.
 class ConsoleLoggerTask extends StartupTask<void> {
+  static const String id = 'ConsoleLoggerTask';
+
   @override
-  String get id => 'ConsoleLoggerTask';
+  String get id => ConsoleLoggerTask.id;
 
   @override
   Set<String> get dependencies => {};

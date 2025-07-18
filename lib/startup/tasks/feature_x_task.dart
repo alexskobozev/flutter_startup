@@ -8,11 +8,13 @@ import 'remote_config_task.dart';
 
 /// Initializes a hypothetical Feature X.
 class FeatureXTask extends StartupTask<String> {
-  @override
-  String get id => 'FeatureXTask';
+  static const String id = 'FeatureXTask';
 
   @override
-  Set<String> get dependencies => {DatabaseTask().id, RemoteConfigTask().id};
+  String get id => FeatureXTask.id;
+
+  @override
+  Set<String> get dependencies => {DatabaseTask.id, RemoteConfigTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -27,8 +29,8 @@ class FeatureXTask extends StartupTask<String> {
   Future<String> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Feature X...');
 
-    final dbPath = context.get<String>(DatabaseTask().id);
-    final remoteConfig = context.get<Map<String,dynamic>>(RemoteConfigTask().id);
+    final dbPath = context.get<String>(DatabaseTask.id);
+    final remoteConfig = context.get<Map<String,dynamic>>(RemoteConfigTask.id);
     final featureXSpecificSetting = remoteConfig['feature_X_specific_setting'] ?? 'default_X';
 
     context.observabilityService.logVerbose('$id: Feature X using DB: $dbPath and config: $featureXSpecificSetting');

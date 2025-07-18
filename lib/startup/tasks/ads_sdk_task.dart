@@ -8,11 +8,13 @@ import 'flags_task.dart';
 
 /// Initializes the Ads SDK.
 class AdsSdkTask extends StartupTask<bool> {
-  @override
-  String get id => 'AdsSdkTask';
+  static const String id = 'AdsSdkTask';
 
   @override
-  Set<String> get dependencies => {GoogleIdTask().id, FlagsTask().id};
+  String get id => AdsSdkTask.id;
+
+  @override
+  Set<String> get dependencies => {GoogleIdTask.id, FlagsTask.id};
 
   @override
   bool isEnabled(Map<String, dynamic> flags) {
@@ -23,8 +25,8 @@ class AdsSdkTask extends StartupTask<bool> {
   Future<bool> run(StartupContext context) async {
     context.observabilityService.logInfo('$id: Initializing Ads SDK...');
 
-    final googleId = context.get<String>(GoogleIdTask().id);
-    final appFlags = context.get<Map<String, dynamic>>(FlagsTask().id);
+    final googleId = context.get<String>(GoogleIdTask.id);
+    final appFlags = context.get<Map<String, dynamic>>(FlagsTask.id);
     context.observabilityService.logVerbose('$id: Ads SDK using Google ID: $googleId and flags: $appFlags');
 
     if (!(appFlags['ads_enabled'] ?? false)) {
